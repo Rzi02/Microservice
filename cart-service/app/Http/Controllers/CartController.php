@@ -9,6 +9,7 @@ use App\Services\CartService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Log;
 use Throwable;
+use App\Exceptions\ProductNotFoundException;
 
 class CartController extends Controller
 {
@@ -45,6 +46,8 @@ class CartController extends Controller
                 'message' => 'Item berhasil ditambahkan ke keranjang',
                 'data' => $item,
             ], $item->wasRecentlyCreated ? 201 : 200);
+        } catch (ProductNotFoundException $e) {
+            return response()->json(['message' => $e->getMessage()], 404);
         } catch (Throwable $e) {
             return $this->errorResponse($e, 'menambahkan item');
         }

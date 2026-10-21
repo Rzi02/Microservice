@@ -4,9 +4,13 @@ namespace App\Services;
 
 use App\Exceptions\CartItemNotFoundException;
 use App\Models\CartItem;
+use App\Exceptions\ProductNotFoundException;
 
 class CartService
 {
+    public function __construct(private ProductService $productService)
+    {
+    }
     public function getCart(int $userId): array
     {
         $items = CartItem::forUser($userId)->get();
@@ -23,6 +27,9 @@ class CartService
         int $productId,
         int $quantity
     ): CartItem {
+        if (! $this->productService->getProduct($productId)) {
+            throw new ProductNotFoundException($productId);
+        }
         $item = CartItem::firstOrNew([
             'user_id' => $userId,
             'product_id' => $productId,
