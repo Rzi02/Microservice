@@ -4,6 +4,7 @@ namespace App\Clients;
 
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
+use Throwable;
 
 class ProductServiceClient
 {
@@ -12,7 +13,7 @@ class ProductServiceClient
     public function __construct()
     {
         $this->baseUrl = rtrim(
-            config('services.product.url'),
+            (string) config('services.product.url'),
             '/'
         );
     }
@@ -26,20 +27,32 @@ class ProductServiceClient
 
             if ($response->status() === 404) {
                 throw new RuntimeException(
-                    "Produk dengan ID {$productId} tidak ditemukan."
+                    "Produk dengan ID {$productId} tidak ditemukan.",
+                    404
                 );
             }
 
             $response->throw();
 
-            return $response->json();
-        } catch (RuntimeException $exception) {
-            throw $exception;
-        } catch (\Throwable $exception) {
+            $body = $response->json();
+            $product = $body['data'] ?? null;
+
+            if (! is_array($product)) {
+                throw new RuntimeException(
+                    'Format respons Product Service tidak valid.'
+                );
+            }
+
+            return $product;
+        } catch (Throwable $exception) {
+            if ($exception->getCode() === 404) {
+                throw $exception;
+            }
+
             report($exception);
 
             throw new RuntimeException(
-                'Product Service tidak dapat dihubungi.',
+                'Product Service tidak dapat dihubungi atau memberikan respons tidak valid.',
                 0,
                 $exception
             );
