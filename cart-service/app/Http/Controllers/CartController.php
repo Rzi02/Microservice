@@ -3,19 +3,19 @@
 namespace App\Http\Controllers;
 
 use App\Exceptions\CartItemNotFoundException;
+use App\Exceptions\ProductNotFoundException;
 use App\Http\Requests\AddCartItemRequest;
 use App\Http\Requests\UpdateCartItemRequest;
 use App\Services\CartService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Log;
 use Throwable;
-use App\Exceptions\ProductNotFoundException;
 
 class CartController extends Controller
 {
-    public function __construct(private CartService $cartService)
-    {
-    }
+    public function __construct(
+        private CartService $cartService
+    ) {}
 
     // GET /carts/{userId}
     public function show(int $userId): JsonResponse
@@ -35,19 +35,48 @@ class CartController extends Controller
     {
         try {
             $data = $request->validated();
+            $userId = (int) $data['user_id'];
 
+            Log::info('Data POST cart', [
+                'data' => $data,
+                'product_service_url' => config('services.product.url'),
+            ]);
+
+            // Jika mengirim beberapa produk
+            if (isset($data['items'])) {
+                $items = $this->cartService->addItems(
+                    $userId,
+                    $data['items']
+                );
+
+                return response()->json([
+                    'message' => 'Beberapa item berhasil ditambahkan ke keranjang.',
+                    'data' => $items,
+                ], 201);
+            }
+
+            // Jika hanya mengirim satu produk
             $item = $this->cartService->addItem(
-                $data['user_id'],
-                $data['product_id'],
-                $data['quantity'] ?? 1
+                $userId,
+                (int) $data['product_id'],
+                (int) ($data['quantity'] ?? 1)
             );
 
             return response()->json([
                 'message' => 'Item berhasil ditambahkan ke keranjang',
                 'data' => $item,
             ], $item->wasRecentlyCreated ? 201 : 200);
+
         } catch (ProductNotFoundException $e) {
-            return response()->json(['message' => $e->getMessage()], 404);
+            Log::warning('Produk tidak ditemukan saat POST cart', [
+                'message' => $e->getMessage(),
+                'product_service_url' => config('services.product.url'),
+            ]);
+
+            return response()->json([
+                'message' => $e->getMessage(),
+            ], 404);
+
         } catch (Throwable $e) {
             return $this->errorResponse($e, 'menambahkan item');
         }
@@ -121,11 +150,13 @@ class CartController extends Controller
             'line' => $e->getLine(),
         ]);
 
-        $body = ['message' => "Gagal {$action}"];
+        $body = [
+            'message' => "Gagal {$action}",
+        ];
 
         if (config('app.debug')) {
             $body['error'] = $e->getMessage();
-            $body['location'] = $e->getFile().':'.$e->getLine();
+            $body['location'] = $e->getFile() . ':' . $e->getLine();
         }
 
         return response()->json($body, 500);
