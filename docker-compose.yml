@@ -1,41 +1,108 @@
 services:
+  product-db:
+    image: mysql:8.0
+    environment:
+      MYSQL_DATABASE: productdb
+      MYSQL_USER: appuser
+      MYSQL_PASSWORD: apppassword
+      MYSQL_ROOT_PASSWORD: rootpassword
+    ports:
+      - "3307:3306"
+    volumes:
+      - product-db-data:/var/lib/mysql
+      - ./product_service/database/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-prootpassword"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
   product-service:
     build:
       context: ./product_service
       dockerfile: Dockerfile
-
     ports:
       - "3000:3000"
-
     environment:
-      - DB_HOST=product-db
-      - DB_USER=appuser
-      - DB_PASSWORD=apppassword
-      - DB_NAME=productdb
-
+      DB_HOST: product-db
+      DB_USER: appuser
+      DB_PASSWORD: apppassword
+      DB_NAME: productdb
     depends_on:
       product-db:
         condition: service_healthy
+    restart: unless-stopped
 
-  product-db:
-    image: mysql:8.0
-
+  cart-db:
+    image: postgres:16-alpine
     environment:
-      - MYSQL_DATABASE=productdb
-      - MYSQL_USER=appuser
-      - MYSQL_PASSWORD=apppassword
-      - MYSQL_ROOT_PASSWORD=rootpassword
-
+      POSTGRES_DB: cartdb
+      POSTGRES_USER: appuser
+      POSTGRES_PASSWORD: apppassword
+    ports:
+      - "5432:5432"
     volumes:
-      - product-db-data:/var/lib/mysql
-      - ./product_service/database/init.sql:/docker-entrypoint-initdb.d/init.sql
-
+      - cart-db-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "--user=root", "--password=rootpassword"]
+      test: ["CMD-SHELL", "pg_isready -U appuser -d cartdb"]
       interval: 10s
-      retries: 5
-      start_period: 30s
       timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  cart-service:
+    build:
+      context: ./cart-service
+      dockerfile: Dockerfile
+    ports:
+      - "3001:3001"
+    environment:
+      DB_CONNECTION: pgsql
+      DB_HOST: cart-db
+      DB_PORT: 5432
+      DB_DATABASE: cartdb
+      DB_USERNAME: appuser
+      DB_PASSWORD: apppassword
+      LOG_CHANNEL: stderr
+      PRODUCT_SERVICE_URL: http://product-service:3000
+    depends_on:
+      cart-db:
+        condition: service_healthy
+      product-service:
+        condition: service_started
+    restart: unless-stopped
+
+  order-service:
+    build:
+      context: ./order-service
+      dockerfile: Dockerfile
+    env_file:
+    - ./order-service/.env
+    
+    ports:
+      - "3003:3003"
+    environment:
+      APP_ENV: local
+      APP_DEBUG: "true"
+      DB_CONNECTION: pgsql
+      DB_HOST: cart-db
+      DB_PORT: 5432
+      DB_DATABASE: cartdb
+      DB_USERNAME: appuser
+      DB_PASSWORD: apppassword
+      LOG_CHANNEL: stderr
+      CART_SERVICE_URL: http://cart-service:3001
+      PRODUCT_SERVICE_URL: http://product-service:3000
+    depends_on:
+      cart-db:
+        condition: service_healthy
+      cart-service:
+        condition: service_started
+      product-service:
+        condition: service_started
+    restart: unless-stopped
 
 volumes:
   product-db-data:
+  cart-db-data:
