@@ -33,13 +33,13 @@ return [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),
             'channel' => env('SLACK_BOT_USER_DEFAULT_CHANNEL'),
         ],
+    ],
     'product' => [
         'url' => env('PRODUCT_SERVICE_URL', 'http://product-service:3000'),
     ],
 
     'cart' => [
-        'url' => env('CART_SERVICE_URL', 'http://cart-service:3000'),
+        'url' => env('CART_SERVICE_URL', 'http://cart-service:3001'),
     ],
 
-    ],
 ];
