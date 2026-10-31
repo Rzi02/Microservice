@@ -13,7 +13,13 @@ class ProductService
         try {
             $response = Http::baseUrl(config('services.product.url'))
                 ->get("/products/{$productId}");
-
+            
+            Log::info('Cek produk dari Cart Service', [
+                'product_id' => $productId,
+                'status' => $response->status(),
+                'has_data' => isset($response->json()['data']),
+            ]);
+            
             if ($response->successful() && isset($response->json()['data'])) {
                 return $response->json()['data'];
             }
