@@ -32,7 +32,7 @@ class CartServiceClient
 
             throw new RuntimeException(
                 'Cart Service tidak dapat mengambil keranjang.',
-                0,
+                503,
                 $exception
             );
         }
@@ -51,7 +51,7 @@ class CartServiceClient
 
             throw new RuntimeException(
                 'Cart Service gagal mengosongkan keranjang.',
-                0,
+                503,
                 $exception
             );
         }
